@@ -1,0 +1,195 @@
+id: backfill_appointments
+namespace: oralsolutions
+description: Recuperacion historica de citas faltantes en RAW por fechas
+
+# PARAMETROS DEL BACKFILL
+inputs:
+  - id: fecha_inicio
+    type: DATE
+    required: true
+
+  - id: fecha_fin
+    type: DATE
+    required: true
+
+tasks:
+  # 1. VALIDAR RANGO DE FECHAS
+  - id: validar_fechas
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      SELECT
+        CASE
+          WHEN TO_DATE('{{ inputs.fecha_inicio }}')
+              > TO_DATE('{{ inputs.fecha_fin }}')
+          THEN ERROR('La fecha de inicio no puede ser mayor a la fecha de fin')
+          ELSE 'Rango de fechas valido'
+        END AS VALIDACION;
+
+    fetchType: FETCH_ONE
+
+  # 2. PREPARAR TABLA DE RECEPCION
+  - id: preparar_backfill
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      CREATE OR REPLACE TABLE
+        ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_INCOMING
+      LIKE ORALSOLUTIONS_DW.RAW.APPOINTMENTS;
+
+  # 3. LEER ARCHIVO HISTORICO DEL STAGE
+  - id: cargar_historico
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      COPY INTO
+        ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_INCOMING
+      FROM
+        @ORALSOLUTIONS_DW.RAW.RAW_CSV_STAGE/appointments/
+      FILES = ('appointments.csv')
+      FILE_FORMAT = (
+        FORMAT_NAME = 'ORALSOLUTIONS_DW.RAW.CSV_RAW_FORMAT'
+      )
+      ON_ERROR = ABORT_STATEMENT
+      FORCE = FALSE;
+
+    retry:
+      type: exponential
+      interval: PT5S
+      maxInterval: PT30S
+      maxAttempts: 3
+
+  # 4. RECUPERAR SOLO CITAS FALTANTES
+  - id: insertar_historicos
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      -- DEMO (anterior):
+      -- INSERT INTO ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_DEMO
+
+      -- DESTINO DEFINITIVO:
+      INSERT INTO ORALSOLUTIONS_DW.RAW.APPOINTMENTS
+      SELECT historico.*
+      FROM
+        ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_INCOMING
+        AS historico
+      WHERE
+        TRY_TO_TIMESTAMP_NTZ(
+          historico.SCHEDULED_AT
+        )::DATE
+        BETWEEN
+          TO_DATE('{{ inputs.fecha_inicio }}')
+          AND TO_DATE('{{ inputs.fecha_fin }}')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM
+            -- DEMO (anterior):
+            -- ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_DEMO
+
+            -- TABLA RAW DEFINITIVA:
+            ORALSOLUTIONS_DW.RAW.APPOINTMENTS AS existente
+          WHERE existente.ID = historico.ID
+        );
+
+    retry:
+      type: exponential
+      interval: PT5S
+      maxInterval: PT30S
+      maxAttempts: 3
+
+  # 5. VALIDAR RESULTADO EN RAW
+  - id: validar_backfill
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      SELECT
+        COUNT(*) AS TOTAL_CITAS,
+        COUNT_IF(
+          TRY_TO_TIMESTAMP_NTZ(SCHEDULED_AT)::DATE
+          BETWEEN
+            TO_DATE('{{ inputs.fecha_inicio }}')
+            AND TO_DATE('{{ inputs.fecha_fin }}')
+        ) AS CITAS_DEL_PERIODO,
+        COUNT(DISTINCT ID) AS IDS_DISTINTOS
+      FROM
+        -- DEMO (anterior):
+        -- ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_DEMO;
+
+        -- TABLA RAW DEFINITIVA:
+        ORALSOLUTIONS_DW.RAW.APPOINTMENTS;
+
+    fetchType: FETCH_ONE
+
+  # 6. LIMPIAR TABLA AUXILIAR
+  - id: limpiar_backfill
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      DROP TABLE IF EXISTS
+        ORALSOLUTIONS_DW.RAW.APPOINTMENTS_BACKFILL_INCOMING;
+
+# MANEJO GLOBAL DE ERRORES
+errors:
+  - id: registrar_error_backfill
+    type: io.kestra.plugin.core.log.Log
+    level: ERROR
+    message: >
+      Backfill fallido.
+      Ejecucion: {{ execution.id }}.
+      Periodo: {{ inputs.fecha_inicio }}
+      hasta {{ inputs.fecha_fin }}.
+      Revisar los logs de Kestra.
