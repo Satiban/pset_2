@@ -1,0 +1,5 @@
+﻿id,scheme,plan_name,cover_fraction
+1,accepted_plans,Northgate Dental Plan,0.5
+2,accepted_plans,Civic Health Cover,0.6
+3,accepted_plans,Harbour Mutual,0.7
+4,accepted_plans,Ashford Care Union,0.8

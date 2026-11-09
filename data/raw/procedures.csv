@@ -1,0 +1,11 @@
+﻿id,code,name,fee,chair_minutes,list_name
+1,EXAM,Check-up and examination,45,25,fee_list
+2,POLISH,Scale and polish,85,30,fee_list
+3,XRAY,Bitewing X-rays,40,15,fee_list
+4,FILL1,"Filling, one surface",120,40,fee_list
+5,FILL2,"Filling, two surfaces",165,50,fee_list
+6,FLUOR,Fluoride varnish,35,10,fee_list
+7,EXTRACT,Simple extraction,150,30,fee_list
+8,WHITEN,Whitening session,310,60,fee_list
+9,ROOT,"Root canal, molar",780,90,fee_list
+10,CROWN,Porcelain crown,920,75,fee_list
