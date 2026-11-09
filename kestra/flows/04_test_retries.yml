@@ -1,0 +1,31 @@
+id: test_retries
+namespace: oralsolutions
+
+description: Prueba controlada de reintentos y manejo de errores
+
+tasks:
+  - id: simular_error
+    type: io.kestra.plugin.scripts.shell.Commands
+
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+
+    commands:
+      - 'echo "Simulando fallo temporal de un servicio"'
+      - 'exit 1'
+
+    retry:
+      type: exponential
+      interval: PT5S
+      maxInterval: PT30S
+      maxAttempts: 3
+
+errors:
+  - id: registrar_error
+    type: io.kestra.plugin.core.log.Log
+    level: ERROR
+    message: >
+      Prueba de manejo de errores.
+      La tarea fallo despues de agotar
+      los reintentos.
+      Ejecucion: {{ execution.id }}
