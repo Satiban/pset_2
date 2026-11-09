@@ -1,0 +1,252 @@
+id: ingest_raw_oralsolutions
+namespace: oralsolutions
+
+description: Ingesta incremental de los 11 CSV hacia RAW sin duplicar IDs
+
+tasks:
+  - id: procesar_archivos
+    type: io.kestra.plugin.core.flow.Loop
+    concurrencyLimit: 1
+
+    values:
+      - patients
+      - dentists
+      - insurers
+      - appointments
+      - missed_appointments
+      - invoices
+      - procedures
+      - treatment_lines
+      - treatment_plans
+      - treatment_sessions
+      - patient_followups
+
+    tasks:
+      # 1. LEER CSV ORIGINAL
+      - id: leer_archivo
+        type: io.kestra.plugin.scripts.shell.Commands
+
+        taskRunner:
+          type: io.kestra.plugin.core.runner.Process
+
+        commands:
+          - "test -f /data/raw/{{ item.value }}.csv"
+          - "cp /data/raw/{{ item.value }}.csv data.csv"
+          - "wc -l data.csv"
+
+        outputFiles:
+          - data.csv
+
+      # 2. SUBIR CSV AL STAGE
+      - id: subir_stage
+        type: io.kestra.plugin.jdbc.snowflake.Upload
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        from: "{{ outputs.leer_archivo.outputFiles['data.csv'] }}"
+        stageName: "@ORALSOLUTIONS_DW.RAW.RAW_CSV_STAGE"
+        prefix: "{{ item.value }}"
+        fileName: "{{ item.value }}.csv"
+        compress: false
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+      # 3. CREAR TABLA AUXILIAR VACIA
+      - id: preparar_incoming
+        type: io.kestra.plugin.jdbc.snowflake.Query
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        sql: |
+          CREATE OR REPLACE TABLE
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }}_INCOMING
+          LIKE
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }};
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+      # 4. CARGAR CSV EN TABLA AUXILIAR
+      - id: cargar_incoming
+        type: io.kestra.plugin.jdbc.snowflake.Query
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        sql: |
+          COPY INTO
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }}_INCOMING
+          FROM
+            @ORALSOLUTIONS_DW.RAW.RAW_CSV_STAGE/{{ item.value }}/
+          FILES = ('{{ item.value }}.csv')
+          FILE_FORMAT = (
+            FORMAT_NAME = 'ORALSOLUTIONS_DW.RAW.CSV_RAW_FORMAT'
+          )
+          ON_ERROR = ABORT_STATEMENT
+          FORCE = FALSE;
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+      # 5. VALIDAR REGISTROS RECIBIDOS
+      - id: validar_incoming
+        type: io.kestra.plugin.jdbc.snowflake.Query
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        sql: |
+          SELECT
+            '{{ item.value }}' AS ARCHIVO,
+            COUNT(*) AS REGISTROS_RECIBIDOS,
+            COUNT(DISTINCT ID) AS IDS_DISTINTOS,
+            COUNT_IF(ID IS NULL OR TRIM(ID) = '') AS IDS_VACIOS
+          FROM
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }}_INCOMING;
+
+        fetchType: FETCH_ONE
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+      # 6. INSERTAR SOLO REGISTROS NUEVOS
+      - id: insertar_nuevos
+        type: io.kestra.plugin.jdbc.snowflake.Query
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        sql: |
+          INSERT INTO
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }}
+          SELECT nuevo.*
+          FROM
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }}_INCOMING nuevo
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM ORALSOLUTIONS_DW.RAW.{{ item.value | upper }} existente
+            WHERE existente.ID = nuevo.ID
+          );
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+      # 7. ELIMINAR TABLA AUXILIAR
+      - id: eliminar_incoming
+        type: io.kestra.plugin.jdbc.snowflake.Query
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        sql: |
+          DROP TABLE IF EXISTS
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }}_INCOMING;
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+      # 8. VALIDAR TABLA RAW FINAL
+      - id: validar_tabla
+        type: io.kestra.plugin.jdbc.snowflake.Query
+
+        url: "{{ envs.snowflake_url }}"
+        username: "{{ envs.snowflake_user }}"
+        password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+        role: ACCOUNTADMIN
+        warehouse: COMPUTE_WH
+        database: ORALSOLUTIONS_DW
+        schema: RAW
+
+        sql: |
+          SELECT
+            '{{ item.value }}' AS ARCHIVO,
+            COUNT(*) AS TOTAL_REGISTROS,
+            COUNT(DISTINCT ID) AS IDS_DISTINTOS
+          FROM
+            ORALSOLUTIONS_DW.RAW.{{ item.value | upper }};
+
+        fetchType: FETCH_ONE
+
+        retry:
+          type: exponential
+          interval: PT5S
+          maxInterval: PT30S
+          maxAttempts: 3
+
+# TRIGGER DIARIO
+triggers:
+  - id: ingesta_diaria
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 2 * * *"
+    timezone: America/Guayaquil
+    allowConcurrent: false
+    recoverMissedSchedules: NONE
+
+# MANEJO GLOBAL DE ERRORES
+errors:
+  - id: registrar_error_ingesta
+    type: io.kestra.plugin.core.log.Log
+    level: ERROR
+    message: >
+      Error en el pipeline RAW de OralSolutions.
+      Ejecucion: {{ execution.id }}.
+      Revisar Logs y Gantt para identificar
+      el archivo y la tarea que fallaron.

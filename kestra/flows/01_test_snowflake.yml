@@ -1,0 +1,26 @@
+id: test_snowflake
+namespace: oralsolutions
+
+description: Verificar conexión entre Kestra y Snowflake
+
+tasks:
+  - id: verificar_conexion
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      SELECT
+        CURRENT_VERSION() AS VERSION_SNOWFLAKE,
+        CURRENT_DATABASE() AS BASE_DATOS,
+        CURRENT_SCHEMA() AS ESQUEMA,
+        CURRENT_ROLE() AS ROL;
+
+    fetchType: FETCH_ONE

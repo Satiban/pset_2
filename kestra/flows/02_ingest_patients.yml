@@ -1,0 +1,74 @@
+id: ingest_patients
+namespace: oralsolutions
+
+description: Ingesta del CSV original de pacientes hacia RAW
+
+tasks:
+
+  - id: leer_csv_local
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - test -f /data/raw/patients.csv
+      - cp /data/raw/patients.csv patients.csv
+      - wc -l patients.csv
+    outputFiles:
+      - patients.csv
+
+  - id: subir_csv_stage
+    type: io.kestra.plugin.jdbc.snowflake.Upload
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    from: "{{ outputs.leer_csv_local.outputFiles['patients.csv'] }}"
+    stageName: "@ORALSOLUTIONS_DW.RAW.RAW_CSV_STAGE"
+    prefix: patients
+    fileName: patients.csv
+    compress: false
+
+  - id: cargar_tabla_raw
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      COPY INTO ORALSOLUTIONS_DW.RAW.PATIENTS
+      FROM @ORALSOLUTIONS_DW.RAW.RAW_CSV_STAGE/patients/
+      FILES = ('patients.csv')
+      FILE_FORMAT = (
+        FORMAT_NAME = 'ORALSOLUTIONS_DW.RAW.CSV_RAW_FORMAT'
+      )
+      ON_ERROR = ABORT_STATEMENT;
+
+  - id: validar_registros
+    type: io.kestra.plugin.jdbc.snowflake.Query
+
+    url: "{{ envs.snowflake_url }}"
+    username: "{{ envs.snowflake_user }}"
+    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
+
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+
+    sql: |
+      SELECT COUNT(*) AS TOTAL_REGISTROS
+      FROM ORALSOLUTIONS_DW.RAW.PATIENTS;
+
+    fetchType: FETCH_ONE
