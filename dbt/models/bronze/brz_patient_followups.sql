@@ -1,0 +1,19 @@
+{{ config(
+    materialized='table',
+    alias='BRZ_PATIENT_FOLLOWUPS'
+) }}
+
+SELECT
+    TRY_CAST(ID AS INTEGER) AS ID,
+
+    TRY_CAST(TREATMENT_PLAN_ID AS INTEGER)
+        AS TREATMENT_PLAN_ID,
+
+    TRY_CAST(CONTACT_DATE AS DATE)
+        AS CONTACT_DATE,
+
+    CONTACT_METHOD,
+
+    CONTACT_RESULT
+
+FROM {{ source('raw', 'PATIENT_FOLLOWUPS') }}

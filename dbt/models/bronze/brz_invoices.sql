@@ -1,0 +1,14 @@
+{{ config(
+    materialized='table',
+    alias='BRZ_INVOICES'
+) }}
+
+SELECT
+    TRY_CAST(ID AS INTEGER) AS ID,
+    TRY_CAST(APPOINTMENT_ID AS INTEGER) AS APPOINTMENT_ID,
+    INVOICE_NO,
+    TRY_CAST(ISSUED_ON AS DATE) AS ISSUED_ON,
+    STATUS,
+    TRY_CAST(PAID_ON AS DATE) AS PAID_ON
+
+FROM {{ source('raw', 'INVOICES') }}

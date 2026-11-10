@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: raw
+    database: ORALSOLUTIONS_DW
+    schema: RAW
+    tables:
+      - name: PATIENTS
+      - name: APPOINTMENTS
+      - name: TREATMENT_PLANS
+      - name: TREATMENT_SESSIONS
+      - name: MISSED_APPOINTMENTS
+      - name: PATIENT_FOLLOWUPS
+      - name: DENTISTS
+      - name: INSURERS
+      - name: PROCEDURES
+      - name: TREATMENT_LINES
+      - name: INVOICES

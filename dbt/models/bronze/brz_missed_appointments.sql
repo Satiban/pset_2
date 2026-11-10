@@ -1,0 +1,20 @@
+{{ config(
+    materialized='table',
+    alias='BRZ_MISSED_APPOINTMENTS'
+) }}
+
+SELECT
+    TRY_CAST(ID AS INTEGER) AS ID,
+
+    TRY_CAST(PATIENT_ID AS INTEGER)
+        AS PATIENT_ID,
+
+    TRY_CAST(DENTIST_ID AS INTEGER)
+        AS DENTIST_ID,
+
+    TRY_CAST(SCHEDULED_AT AS TIMESTAMP_NTZ)
+        AS SCHEDULED_AT,
+
+    OUTCOME
+
+FROM {{ source('raw', 'MISSED_APPOINTMENTS') }}
