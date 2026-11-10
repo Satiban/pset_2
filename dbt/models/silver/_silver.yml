@@ -1,0 +1,479 @@
+version: 2
+
+models:
+  - name: slv_insurers
+    description: >
+      Catálogo depurado de aseguradoras de OralSolutions.
+      Conserva los cuatro registros originales de Bronze.
+    columns:
+      - name: id
+        description: Identificador único de aseguradora.
+        data_tests:
+          - not_null
+          - unique
+      - name: scheme
+        description: Esquema de aseguramiento.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['accepted_plans']
+      - name: plan_name
+        description: Nombre del plan de aseguramiento.
+        data_tests:
+          - not_null
+      - name: cover_fraction
+        description: Fracción de cobertura entre 0 y 1.
+        data_tests:
+          - not_null
+
+  - name: slv_patients
+    description: >
+      Pacientes depurados de OralSolutions.
+      Se conservan los nulos legítimos y se normalizan
+      los correos electrónicos inválidos.
+    columns:
+      - name: id
+        description: Identificador único del paciente.
+        data_tests:
+          - not_null
+          - unique
+      - name: first_name
+        description: Nombre del paciente.
+        data_tests:
+          - not_null
+      - name: last_name
+        description: Apellido del paciente.
+        data_tests:
+          - not_null
+      - name: email
+        description: >
+          Correo electrónico normalizado.
+          Puede ser NULL cuando no existe o es inválido.
+      - name: birth_date
+        description: Fecha de nacimiento del paciente.
+        data_tests:
+          - not_null
+      - name: insurer_id
+        description: >
+          Identificador de aseguradora.
+          NULL cuando el paciente no tiene seguro.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('slv_insurers')
+                field: id
+      - name: cover_fraction
+        description: >
+          Fracción de cobertura del paciente.
+          NULL cuando no tiene aseguradora.
+      - name: registered_at
+        description: >
+          Fecha de registro del paciente.
+          Puede ser NULL cuando es desconocida.
+
+  - name: slv_dentists
+    description: >
+      Catálogo depurado de odontólogos de OralSolutions.
+      Conserva los cinco registros originales y valida
+      las categorías de contrato y las fechas de ingreso.
+    columns:
+      - name: id
+        description: Identificador único del odontólogo.
+        data_tests:
+          - not_null
+          - unique
+      - name: first_name
+        description: Nombre del odontólogo.
+        data_tests:
+          - not_null
+      - name: last_name
+        description: Apellido del odontólogo.
+        data_tests:
+          - not_null
+      - name: contract
+        description: Tipo de contrato del odontólogo.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - full_time
+                  - associate
+      - name: joined_on
+        description: Fecha de incorporación a la clínica.
+        data_tests:
+          - not_null
+
+  - name: slv_procedures
+    description: >
+      Catálogo de procedimientos odontológicos de OralSolutions.
+      Conserva los diez registros originales y valida
+      códigos, tarifas y duración de procedimientos.
+    columns:
+      - name: id
+        description: Identificador único del procedimiento.
+        data_tests:
+          - not_null
+          - unique
+      - name: list_name
+        description: Lista tarifaria del procedimiento.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['fee_list']
+      - name: code
+        description: Código único del procedimiento.
+        data_tests:
+          - not_null
+          - unique
+      - name: name
+        description: Nombre del procedimiento odontológico.
+        data_tests:
+          - not_null
+      - name: fee
+        description: Tarifa del procedimiento odontológico.
+        data_tests:
+          - not_null
+      - name: chair_minutes
+        description: Duración estimada del procedimiento en minutos.
+        data_tests:
+          - not_null
+
+  - name: slv_appointments
+    description: >
+      Citas odontológicas depuradas de OralSolutions.
+      Conserva el historial de 7788 citas y valida
+      pacientes, odontólogos, tipos de visita y cobertura.
+    columns:
+      - name: id
+        description: Identificador único de la cita.
+        data_tests:
+          - not_null
+          - unique
+      - name: patient_id
+        description: Paciente asociado a la cita.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_patients')
+                field: id
+      - name: dentist_id
+        description: Odontólogo asignado a la cita.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_dentists')
+                field: id
+      - name: scheduled_at
+        description: Fecha y hora programada de la cita.
+        data_tests:
+          - not_null
+      - name: visit_type
+        description: Tipo de visita odontológica.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - follow_up
+                  - treatment
+                  - routine
+                  - emergency
+      - name: cover_fraction
+        description: >
+          Fracción de cobertura de la cita.
+          NULL representa ausencia de seguro.
+
+  - name: slv_missed_appointments
+    description: >
+      Registro depurado de citas no realizadas.
+      Conserva las 1500 observaciones originales,
+      incluidas las citas no vinculadas con sesiones
+      de tratamiento.
+    columns:
+      - name: id
+        description: Identificador único del registro.
+        data_tests:
+          - not_null
+          - unique
+      - name: patient_id
+        description: Paciente asociado.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_patients')
+                field: id
+      - name: dentist_id
+        description: Odontólogo asignado.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_dentists')
+                field: id
+      - name: scheduled_at
+        description: Fecha y hora programada.
+        data_tests:
+          - not_null
+      - name: outcome
+        description: >
+          Resultado de la cita no realizada.
+          Distingue inasistencias y cancelaciones.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - no_show
+                  - cancelled_same_day
+                  - cancelled_in_advance
+
+  - name: slv_treatment_plans
+    description: >
+      Planes de tratamiento odontológico de OralSolutions.
+      Conserva fechas y motivos de cierre desconocidos
+      sin introducir imputaciones artificiales.
+    columns:
+      - name: id
+        description: Identificador único del plan.
+        data_tests:
+          - not_null
+          - unique
+      - name: patient_id
+        description: Paciente propietario del plan.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_patients')
+                field: id
+      - name: dentist_id
+        description: Odontólogo responsable.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_dentists')
+                field: id
+      - name: procedure_id
+        description: Procedimiento planificado.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_procedures')
+                field: id
+      - name: start_date
+        description: Fecha de inicio del tratamiento.
+        data_tests:
+          - not_null
+      - name: planned_sessions
+        description: Número de sesiones planificadas.
+        data_tests:
+          - not_null
+      - name: estimated_cost
+        description: Coste estimado del tratamiento.
+        data_tests:
+          - not_null
+      - name: status
+        description: Estado del plan de tratamiento.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - completed
+                  - active
+                  - paused
+                  - discontinued
+      - name: end_date
+        description: >
+          Fecha de finalización del tratamiento.
+          Puede ser NULL si permanece activo o pausado.
+      - name: closure_reason
+        description: >
+          Motivo de cierre o pausa del tratamiento.
+          Puede ser NULL cuando no aplica o se desconoce.
+
+  - name: slv_treatment_sessions
+    description: >
+      Historial de intentos de sesiones odontológicas.
+      Conserva reintentos y anomalías temporales
+      documentadas para mantener la trazabilidad.
+    columns:
+      - name: id
+        description: Identificador único de sesión.
+        data_tests:
+          - not_null
+          - unique
+      - name: treatment_plan_id
+        description: Plan de tratamiento asociado.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_treatment_plans')
+                field: id
+      - name: appointment_id
+        description: Cita atendida, cuando corresponde.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('slv_appointments')
+                field: id
+      - name: missed_appointment_id
+        description: Cita no realizada, cuando corresponde.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('slv_missed_appointments')
+                field: id
+      - name: session_number
+        description: Número de sesión dentro del tratamiento.
+        data_tests:
+          - not_null
+      - name: planned_date
+        description: Fecha planificada.
+        data_tests:
+          - not_null
+      - name: completed_at
+        description: Fecha real de atención, si fue completada.
+      - name: status
+        description: Estado de la sesión.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - completed
+                  - cancelled
+                  - missed
+
+  - name: slv_treatment_lines
+    description: >
+      Líneas de procedimientos realizados en citas odontológicas.
+      Conserva los importes originales y valida su
+      integridad financiera y referencial.
+    columns:
+      - name: id
+        description: Identificador único de la línea.
+        data_tests:
+          - not_null
+          - unique
+      - name: appointment_id
+        description: Cita asociada al procedimiento.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_appointments')
+                field: id
+      - name: procedure_id
+        description: Procedimiento odontológico registrado.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_procedures')
+                field: id
+      - name: fee
+        description: Tarifa total del procedimiento.
+        data_tests:
+          - not_null
+      - name: insurer_amount
+        description: Importe cubierto por aseguradora.
+        data_tests:
+          - not_null
+      - name: patient_amount
+        description: Importe correspondiente al paciente.
+        data_tests:
+          - not_null
+
+  - name: slv_invoices
+    description: >
+      Facturas odontológicas depuradas de OralSolutions.
+      Conserva el historial de facturación y las fechas
+      de pago nulas de facturas sin pago registrado.
+    columns:
+      - name: id
+        description: Identificador único de factura.
+        data_tests:
+          - not_null
+          - unique
+      - name: appointment_id
+        description: Cita asociada a la factura.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('slv_appointments')
+                field: id
+      - name: invoice_no
+        description: Número único de factura.
+        data_tests:
+          - not_null
+          - unique
+      - name: issued_on
+        description: Fecha de emisión de factura.
+        data_tests:
+          - not_null
+      - name: status
+        description: Estado de facturación.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - paid
+                  - outstanding
+                  - written_off
+      - name: paid_on
+        description: >
+          Fecha de pago de la factura.
+          NULL para facturas pendientes o dadas de baja
+          sin pago registrado.
+
+  - name: slv_patient_followups
+    description: >
+      Seguimientos de pacientes asociados a planes odontológicos.
+      Normaliza los métodos de contacto y representa como NULL
+      los resultados desconocidos. Conserva los contactos
+      posteriores al cierre del tratamiento.
+    columns:
+      - name: id
+        description: Identificador único del seguimiento.
+        data_tests:
+          - not_null
+          - unique
+      - name: treatment_plan_id
+        description: Plan de tratamiento asociado.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_treatment_plans')
+                field: id
+      - name: contact_date
+        description: Fecha y hora del contacto.
+        data_tests:
+          - not_null
+      - name: contact_method
+        description: Método de contacto normalizado a minúsculas.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - whatsapp
+                  - phone
+                  - email
+      - name: contact_result
+        description: >
+          Resultado del contacto.
+          Puede ser NULL cuando no se registró una respuesta.
