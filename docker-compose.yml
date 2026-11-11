@@ -24,6 +24,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
       - ./data/raw:/data/raw:ro
+      - ./dbt:/app/dbt:ro
 
     environment:
       KESTRA_CONFIGURATION: |
@@ -49,7 +50,13 @@ services:
           tasks:
             tmp-dir:
               path: /tmp/kestra-wd/tmp
+          plugins:
+            configurations:
+              - type: io.kestra.plugin.scripts.runner.docker.Docker
+                values:
+                  volume-enabled: true
           url: http://localhost:8080/
+
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -76,6 +83,24 @@ services:
 
     ports:
       - "127.0.0.1:4040:4040"
+
+    restart: unless-stopped
+
+  dbt:
+    build:
+      context: .
+      dockerfile: Dockerfile.dbt
+
+    working_dir: /app/dbt
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./dbt:/app/dbt
+      - C:/Users/ANDRES/.dbt:/root/.dbt:ro
+
+    entrypoint: ["tail", "-f", "/dev/null"]
 
     restart: unless-stopped
 
