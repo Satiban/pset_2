@@ -56,6 +56,30 @@ services:
       postgres:
         condition: service_healthy
 
+  spark:
+    image: apache/spark:3.5.3
+    user: "root"
+    working_dir: /opt/spark/work-dir
+    entrypoint: ["/bin/bash", "-lc"]
+    command: ["sleep infinity"]
+
+    env_file:
+      - .env
+
+    environment:
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYSPARK_PYTHON: python3
+
+    volumes:
+      - ./spark:/opt/spark/work-dir
+      - spark_ivy:/root/.ivy2
+
+    ports:
+      - "127.0.0.1:4040:4040"
+
+    restart: unless-stopped
+
 volumes:
   datos_postgres:
   datos_kestra:
+  spark_ivy:
