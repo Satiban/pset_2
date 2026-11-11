@@ -1,0 +1,7 @@
+SELECT *
+FROM {{ ref('dim_paciente') }}
+WHERE FRACCION_COBERTURA IS NOT NULL
+    AND (
+        FRACCION_COBERTURA < 0
+        OR FRACCION_COBERTURA > 1
+    )
