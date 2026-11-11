@@ -1,0 +1,188 @@
+version: 2
+
+models:
+  - name: dim_paciente
+    description: >
+      Dimension de pacientes para el modelo
+      dimensional de OralSolutions.
+    columns:
+      - name: PACIENTE_KEY
+        description: Identificador unico del paciente.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: dim_odontologo
+    description: >
+      Dimension de odontologos responsables
+      de los tratamientos de OralSolutions.
+    columns:
+      - name: ODONTOLOGO_KEY
+        description: Identificador unico del odontologo.
+        data_tests:
+          - not_null
+          - unique
+      - name: TIPO_CONTRATO
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - full_time
+                  - associate
+      - name: FECHA_INCORPORACION
+        data_tests:
+          - not_null
+
+  - name: dim_procedimiento
+    description: >
+      Dimension del catalogo de procedimientos odontologicos
+      utilizados en los planes de tratamiento de OralSolutions.
+    columns:
+      - name: PROCEDIMIENTO_KEY
+        description: Identificador unico del procedimiento.
+        data_tests:
+          - not_null
+          - unique
+      - name: CODIGO_PROCEDIMIENTO
+        data_tests:
+          - not_null
+          - unique
+      - name: NOMBRE_PROCEDIMIENTO
+        data_tests:
+          - not_null
+      - name: LISTA_TARIFARIA
+        data_tests:
+          - not_null
+      - name: TARIFA_BASE
+        data_tests:
+          - not_null
+      - name: DURACION_ESTIMADA_MIN
+        data_tests:
+          - not_null
+
+  - name: dim_fecha
+    description: >
+      Dimension calendario utilizada para analizar
+      las fechas de sesiones y planes de tratamiento.
+    columns:
+      - name: FECHA_KEY
+        description: Clave de fecha en formato YYYYMMDD.
+        data_tests:
+          - not_null
+          - unique
+      - name: FECHA
+        description: Fecha calendario.
+        data_tests:
+          - not_null
+          - unique
+      - name: ANIO
+        data_tests:
+          - not_null
+      - name: MES
+        data_tests:
+          - not_null
+      - name: TRIMESTRE
+        data_tests:
+          - not_null
+      - name: DIA_SEMANA
+        data_tests:
+          - not_null
+      - name: ES_FIN_SEMANA
+        data_tests:
+          - not_null
+
+  - name: dim_estado
+    description: >
+      Dimension de estados de las sesiones
+      de tratamiento odontologico.
+    columns:
+      - name: ESTADO_KEY
+        description: Clave unica del estado.
+        data_tests:
+          - not_null
+          - unique
+      - name: ESTADO
+        description: Estado normalizado de la sesion.
+        data_tests:
+          - not_null
+          - unique
+          - accepted_values:
+              arguments:
+                values:
+                  - completed
+                  - cancelled
+                  - missed
+      - name: DESCRIPCION_ESTADO
+        data_tests:
+          - not_null
+      - name: ES_COMPLETADA
+        data_tests:
+          - not_null
+      - name: ES_CANCELADA
+        data_tests:
+          - not_null
+      - name: ES_INASISTENCIA
+        data_tests:
+          - not_null
+
+  - name: fact_sesiones_tratamiento
+    description: >
+      Tabla de hechos de sesiones de tratamiento.
+      Grano: una fila por sesion identificada
+      mediante SESSION_ID de Silver.
+    columns:
+      - name: SESION_KEY
+        data_tests:
+          - not_null
+          - unique
+      - name: PLAN_TRATAMIENTO_ID
+        data_tests:
+          - not_null
+      - name: PACIENTE_KEY
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_paciente')
+                field: PACIENTE_KEY
+      - name: ODONTOLOGO_KEY
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_odontologo')
+                field: ODONTOLOGO_KEY
+      - name: PROCEDIMIENTO_KEY
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_procedimiento')
+                field: PROCEDIMIENTO_KEY
+      - name: ESTADO_KEY
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_estado')
+                field: ESTADO_KEY
+      - name: FECHA_PLANIFICADA_KEY
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: FECHA_KEY
+      - name: FECHA_REALIZADA_KEY
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: FECHA_KEY
+      - name: CANTIDAD_EVENTOS
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1]
