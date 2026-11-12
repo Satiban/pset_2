@@ -1,0 +1,13 @@
+oralsolutions:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "<TU_CUENTA_SNOWFLAKE>"
+      user: "<TU_USUARIO>"
+      password: "<TU_CONTRASENA>"
+      role: "<TU_ROL_AUTORIZADO>"
+      database: ORALSOLUTIONS_DW
+      warehouse: "<TU_WAREHOUSE>"
+      schema: BRONZE
+      threads: 4

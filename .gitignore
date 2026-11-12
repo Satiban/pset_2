@@ -19,4 +19,8 @@ dbt_packages/
 Thumbs.db
 
 # Archivos temporales
+logs/
 *.log
+
+# Configuración privada de dbt
+/config/dbt/profiles.yml
