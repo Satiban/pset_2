@@ -135,3 +135,14 @@ CREATE FILE FORMAT IF NOT EXISTS CSV_RAW_FORMAT
     TRIM_SPACE = FALSE
     NULL_IF = ()
     ERROR_ON_COLUMN_COUNT_MISMATCH = TRUE;
+
+-- ============================================
+-- STAGE INTERNO PARA LA INGESTA DE ARCHIVOS CSV
+-- ============================================
+
+CREATE STAGE IF NOT EXISTS
+    ORALSOLUTIONS_DW.RAW.RAW_CSV_STAGE;
+
+-- Verificar que el stage exista
+SHOW STAGES LIKE 'RAW_CSV_STAGE'
+IN SCHEMA ORALSOLUTIONS_DW.RAW;
