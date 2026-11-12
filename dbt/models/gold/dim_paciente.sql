@@ -13,7 +13,7 @@ WITH pacientes AS (
         COVER_FRACTION,
         REGISTERED_AT
 
-    FROM {{ source('silver', 'SLV_PATIENTS') }}
+    FROM {{ ref('slv_patients') }}
 
 )
 
