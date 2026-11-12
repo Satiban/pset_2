@@ -44,7 +44,7 @@ La implementación actual utiliza estos nombres en los scripts SQL y en determin
 | Esquemas | `RAW`, `BRONZE`, `SILVER`, `GOLD`, `OBT` |
 | Autenticación actual | Usuario y contraseña admitidos por la cuenta |
 
-En una cuenta nueva, utilizar estos nombres y los permisos correspondientes. Si se desea utilizar otro rol, warehouse o nombre de base de datos, habrá que modificar **de manera coherente los YAML, scripts SQL, perfil dbt y configuración de Spark**. La inicialización SQL crea la base, los esquemas, las tablas Raw y el stage, pero **no aprovisiona el usuario ni el warehouse**.
+En una cuenta nueva, utilizar estos nombres y los permisos correspondientes. Si se desea utilizar otro rol, warehouse o nombre de base de datos, habrá que modificar **de manera coherente los YAML, scripts SQL, perfil dbt y configuración de Spark**. La inicialización SQL crea el warehouse, la base, los esquemas, las tablas Raw y el stage, pero **no aprovisiona el usuario**.
 
 ## 3. Configurar las credenciales
 
@@ -101,7 +101,7 @@ La ruta real puede variar. El subflujo Spark carga `.env` mediante Bash: guardar
 
 **4.1. En Snowsight**, ejecutar en este orden:
 
-1. `sql/01_setup_snowflake.sql`: crea `ORALSOLUTIONS_DW` y los esquemas `RAW`, `BRONZE`, `SILVER`, `GOLD`, `OBT`.
+1. `sql/01_setup_snowflake.sql`: crea el warehouse `COMPUTE_WH`, la base `ORALSOLUTIONS_DW` y los esquemas `RAW`, `BRONZE`, `SILVER`, `GOLD`, `OBT`. 
 2. `sql/02_create_raw_tables.sql`: crea las 11 tablas Raw, el formato CSV y el stage de ingesta.
 
 Antes de ejecutar estos scripts, verificar el acceso al rol `ACCOUNTADMIN`, la existencia de `COMPUTE_WH` y los permisos necesarios.
