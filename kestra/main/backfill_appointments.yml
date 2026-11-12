@@ -2,7 +2,6 @@ id: backfill_appointments
 namespace: oralsolutions
 description: Recuperacion historica de citas faltantes en RAW por fechas
 
-# PARAMETROS DEL BACKFILL
 inputs:
   - id: fecha_inicio
     type: DATE
@@ -15,27 +14,16 @@ inputs:
 tasks:
   # 1. VALIDAR RANGO DE FECHAS
   - id: validar_fechas
-    type: io.kestra.plugin.jdbc.snowflake.Query
-
-    url: "{{ envs.snowflake_url }}"
-    username: "{{ envs.snowflake_user }}"
-    password: "{{ secret('SNOWFLAKE_PASSWORD') }}"
-
-    role: ACCOUNTADMIN
-    warehouse: COMPUTE_WH
-    database: ORALSOLUTIONS_DW
-    schema: RAW
-
-    sql: |
-      SELECT
-        CASE
-          WHEN TO_DATE('{{ inputs.fecha_inicio }}')
-              > TO_DATE('{{ inputs.fecha_fin }}')
-          THEN ERROR('La fecha de inicio no puede ser mayor a la fecha de fin')
-          ELSE 'Rango de fechas valido'
-        END AS VALIDACION;
-
-    fetchType: FETCH_ONE
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{ inputs.fecha_inicio > inputs.fecha_fin }}"
+    then:
+      - id: rango_invalido
+        type: io.kestra.plugin.core.execution.Fail
+        errorMessage: "La fecha de inicio no puede ser mayor a la fecha de fin"
+    else:
+      - id: rango_valido
+        type: io.kestra.plugin.core.log.Log
+        message: "Rango de fechas valido"
 
   # 2. PREPARAR TABLA DE RECEPCION
   - id: preparar_backfill
