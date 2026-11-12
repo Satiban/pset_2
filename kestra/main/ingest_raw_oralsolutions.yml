@@ -231,15 +231,6 @@ tasks:
           maxInterval: PT30S
           maxAttempts: 3
 
-# TRIGGER DIARIO
-triggers:
-  - id: ingesta_diaria
-    type: io.kestra.plugin.core.trigger.Schedule
-    cron: "0 2 * * *"
-    timezone: America/Guayaquil
-    allowConcurrent: false
-    recoverMissedSchedules: NONE
-
 # MANEJO GLOBAL DE ERRORES
 errors:
   - id: registrar_error_ingesta

@@ -1,0 +1,37 @@
+id: pipeline_oralsolutions
+namespace: oralsolutions
+
+description: >
+  Pipeline maestro de OralSolutions.
+  Ejecuta ingesta RAW, transformaciones dbt
+  y construccion de OBT con Spark.
+
+tasks:
+  - id: ingesta_raw
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: oralsolutions
+    flowId: ingest_raw_oralsolutions
+    wait: true
+    transmitFailed: true
+
+  - id: transformar_y_validar_dbt
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: oralsolutions
+    flowId: test_dbt_docker
+    wait: true
+    transmitFailed: true
+
+  - id: construir_obt_spark
+    type: io.kestra.plugin.core.flow.Subflow
+    namespace: oralsolutions
+    flowId: test_spark_docker
+    wait: true
+    transmitFailed: true
+
+triggers:
+  - id: pipeline_diario
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 2 * * *"
+    timezone: America/Guayaquil
+    allowConcurrent: false
+    recoverMissedSchedules: NONE

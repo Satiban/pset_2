@@ -1,0 +1,57 @@
+id: test_spark_docker
+namespace: oralsolutions
+
+description: Construir y validar la OBT de OralSolutions mediante Apache Spark
+
+tasks:
+  - id: probar_conexion_snowflake
+    type: io.kestra.plugin.scripts.shell.Commands
+
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      image: apache/spark:3.5.3
+      pullPolicy: NEVER
+      volumes:
+        - "{{ envs.kestra_host_project_path }}/spark:/opt/spark/work-dir:ro"
+        - "{{ envs.kestra_host_project_path }}/.env:/config/.env:ro"
+
+    commands:
+      - |
+        set -e
+        set -a
+        . /config/.env
+        set +a
+        # Eliminar espacios, CR y LF externos de variables Snowflake
+        for variable in SF_ACCOUNT SF_USER SF_DATABASE SF_WAREHOUSE SF_ROLE SF_GOLD_SCHEMA SF_OBT_SCHEMA SECRET_SNOWFLAKE_PASSWORD
+        do
+          eval "valor=\${$variable}"
+          valor_limpio="$(printf '%s' "$valor" | python3 -c "import sys; sys.stdout.write(sys.stdin.read().strip())")"
+          export "$variable=$valor_limpio"
+        done
+
+        # Comprobar que el usuario no contiene caracteres invisibles
+        python3 - <<'PY'
+        import os
+        import base64
+
+        usuario = os.environ["SF_USER"]
+        secreto = os.environ["SECRET_SNOWFLAKE_PASSWORD"]
+
+        assert usuario.strip(), "SF_USER no puede estar vacio"
+        assert secreto == secreto.strip(), "Base64 con espacios externos"
+        assert base64.b64decode(secreto, validate=True), "Password vacia"
+
+        print("OK - Usuario y variables normalizados", flush=True)
+        PY
+
+        echo "Probando conexion Spark-Snowflake desde Kestra"
+
+        mkdir -p /tmp/spark-ivy
+
+        /opt/spark/bin/spark-submit \
+          --master "local[*]" \
+          --conf spark.jars.ivy=/tmp/spark-ivy \
+          --packages "net.snowflake:spark-snowflake_2.12:3.2.3-spark_3.5,net.snowflake:snowflake-jdbc:4.0.2" \
+          /opt/spark/work-dir/build_obt.py
+
+        echo "OK - OBT construida correctamente mediante Spark"

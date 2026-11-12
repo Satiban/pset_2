@@ -1,0 +1,29 @@
+id: test_dbt_docker
+namespace: oralsolutions
+
+description: Construir y validar las capas Bronze, Silver y Gold con dbt
+
+tasks:
+  - id: ejecutar_dbt
+    type: io.kestra.plugin.scripts.shell.Commands
+
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      image: pset_2-dbt:latest
+      pullPolicy: NEVER
+      volumes:
+      - "{{ envs.kestra_host_project_path }}/dbt:/app/dbt"
+      - "{{ envs.kestra_host_project_path }}/config/dbt:/root/.dbt:ro"
+
+    commands:
+      - |
+        set -e
+        cd /app/dbt
+
+        echo "=== INICIANDO TRANSFORMACIONES DBT ==="
+        dbt run
+
+        echo "=== INICIANDO PRUEBAS DE CALIDAD ==="
+        dbt test
+
+        echo "=== DBT FINALIZADO CORRECTAMENTE ==="
