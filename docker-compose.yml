@@ -98,7 +98,7 @@ services:
 
     volumes:
       - ./dbt:/app/dbt
-      - C:/Users/ANDRES/.dbt:/root/.dbt:ro
+      - ./config/dbt/profiles.yml:/root/.dbt/profiles.yml:ro
 
     entrypoint: ["tail", "-f", "/dev/null"]
 
